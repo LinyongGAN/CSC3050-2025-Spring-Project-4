@@ -179,7 +179,7 @@ uint64_t MemoryManager::getLong(uint32_t addr, uint32_t *cycles) {
   uint64_t b7 = this->getByte(addr + 6);
   uint64_t b8 = this->getByte(addr + 7);
   return b1 + (b2 << 8) + (b3 << 16) + (b4 << 24) + (b5 << 32) + (b6 << 40) +
-         (b7 << 48) + (b8 << 56);
+        (b7 << 48) + (b8 << 56);
 }
 
 void MemoryManager::printInfo() {
@@ -194,7 +194,7 @@ void MemoryManager::printInfo() {
         continue;
       }
       printf("  0x%x-0x%x\n", (i << 22) + (j << 12),
-             (i << 22) + ((j + 1) << 12));
+            (i << 22) + ((j + 1) << 12));
     }
   }
 }
