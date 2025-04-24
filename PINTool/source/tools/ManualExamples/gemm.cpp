@@ -31,7 +31,6 @@ void matmul2(double *C, double *A, double *B, int n) {
     // complete the missing code here
     for (int k = 0; k < n; k++) {
         for (int i = 0; i < n; i++) {
-            //register double cij = C[i * n + j]; //Please do not delete "register" keyword
             for (int j = 0; j < n; j++) {
                 C[i * n + j] += A[i * n + k] * B[k * n + j];
             }
@@ -52,13 +51,44 @@ void matmul3(double *C, double *A, double *B, int n) {
 
 void matmul4(double *C, double *A, double *B, int n) {
      // complete the missing code here
-     for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            register double cij = C[i * n + j]; //Please do not delete "register" keyword
-            for (int k = 0; k < n; k++) {
-                cij += A[i * n + k] * B[k * n + j];
+    // for (int i = 0; i < n; i++) {
+    //     for (int k = 0; k < n; k++) {
+    //         register double aik = A[i * n + k];
+    //         for (int j = 0; j < n; j++) {
+    //             C[i * n + j] += aik * B[k * n + j];
+    //         }
+    //     }
+    // }
+    int i, j, k, ii, jj, kk;
+    //int i_end, j_end, k_end;
+    int BLOCK_SIZE = 32;
+
+    // Blocked ijk loop
+    for (ii = 0; ii < n; ii += BLOCK_SIZE) {
+        for (jj = 0; jj < n; jj += BLOCK_SIZE) {
+            for (kk = 0; kk < n; kk += BLOCK_SIZE) {                
+                int j_end = (jj + BLOCK_SIZE > n) ? n : jj + BLOCK_SIZE;
+                int i_end = (ii + BLOCK_SIZE > n) ? n : ii + BLOCK_SIZE;    
+                int k_end = (kk + BLOCK_SIZE > n) ? n : kk + BLOCK_SIZE;
+                for (i = ii; i < i_end; i++) {
+                    register double acc[BLOCK_SIZE];
+                    double *c_row = &C[i * n + jj];
+                    for (j = 0; j < j_end - jj; j++) {
+                        acc[j] = c_row[j];
+                    }
+                    for (k = kk; k < k_end; k++) {
+                        register double aik = A[i * n + k];
+                        register double *b_row = &B[k * n + jj];
+                        for (j = 0; j < j_end-jj; j++) {
+                            acc[j] += aik * b_row[j];
+                        }
+                    }
+                    for (j = 0; j < j_end - jj; j++) {
+                        c_row[j] = acc[j];
+                    }
+                }
+
             }
-            C[i * n + j] = cij;
         }
     }
 }
