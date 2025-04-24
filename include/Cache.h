@@ -44,9 +44,9 @@ public:
         std::vector<uint8_t> data;
         Block() {}
         Block(const Block &b)
-            : valid(b.valid), modified(b.modified), tag(b.tag), id(b.id),
-              size(b.size) {
-          data = b.data;
+        : valid(b.valid), modified(b.modified), tag(b.tag), id(b.id),
+            size(b.size) {
+        data = b.data;
         }
     };
 
@@ -62,8 +62,8 @@ public:
 
     bool inCache(uint32_t addr);
     uint32_t getBlockId(uint32_t addr);
-    uint8_t getByte(uint32_t addr, uint32_t *cycles = nullptr);
-    void setByte(uint32_t addr, uint8_t val, uint32_t *cycles = nullptr);
+    uint8_t getByte(uint32_t addr, uint32_t *cycles = nullptr, bool countStats = true);
+    virtual void setByte(uint32_t addr, uint8_t val, uint32_t *cycles = nullptr, bool countStats = true);
 
     void printInfo(bool verbose);
     void printStatistics();
