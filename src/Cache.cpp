@@ -3,7 +3,11 @@
 
 #include "Cache.h"
 
-Cache::Cache(MemoryManager *manager, Policy policy, Cache *lowerCache) {
+#define PREFETCHING 1
+#define FIFO 2
+#define VICTIM 3
+
+Cache::Cache(MemoryManager *manager, Policy policy, Cache *lowerCache, int tech) {
   this->referenceCounter = 0;
   this->memory = manager;
   this->policy = policy;
@@ -18,10 +22,50 @@ Cache::Cache(MemoryManager *manager, Policy policy, Cache *lowerCache) {
   this->statistics.numHit = 0;
   this->statistics.numMiss = 0;
   this->statistics.totalCycles = 0;
+
+  this->tech = tech;
+  this->previous_stride = 0;
+  this->tripleSame = 0; this->tripleDiff = 0;
+  this->previous_address = 0;
 }
 
 bool Cache::inCache(uint32_t addr) {
   return getBlockId(addr) != -1 ? true : false;
+}
+
+void Cache::handlePrefetching(uint32_t addr) {
+  this->stride = addr - this->previous_address;
+  if (this->stride == this->previous_stride)
+  {
+    this->tripleSame++;
+    this->tripleDiff = 0;
+  } else {
+    this->tripleSame = 0;
+    this->tripleDiff++;
+  }
+
+  previous_address = addr;
+  previous_stride = stride;
+
+  if (!this->is_prefetch && this->tripleSame >= 3)
+  {
+    this->is_prefetch = true;
+    prefetch(addr+stride);
+  }
+  if (this->is_prefetch && this->tripleDiff >= 3)
+  {
+    this->is_prefetch = false;
+  }
+  if (this->is_prefetch) prefetch(addr+stride);
+}
+
+void Cache::prefetch(uint32_t addr)
+{
+  if(!this->memory->isPageExist(addr)) this->memory->addPage(addr);
+
+  if (this->getBlockId(addr) != -1) return;
+  this->loadBlockFromLowerLevel(addr, nullptr);
+  return;
 }
 
 uint32_t Cache::getBlockId(uint32_t addr) {
@@ -47,6 +91,8 @@ uint8_t Cache::getByte(uint32_t addr, uint32_t *cycles, bool countStats) {
     this->referenceCounter++;
     this->statistics.numRead++;
   }
+ 
+  if (this->tech == PREFETCHING) handlePrefetching(addr);
 
   // If in cache, return directly
   int blockId = this->getBlockId(addr);
@@ -90,6 +136,8 @@ void Cache::setByte(uint32_t addr, uint8_t val, uint32_t *cycles, bool countStat
     this->referenceCounter++;
     this->statistics.numWrite++;
   }
+
+  if (this->tech == PREFETCHING) handlePrefetching(addr);
 
   // If in cache, write to it directly
   int blockId = this->getBlockId(addr);
@@ -241,6 +289,8 @@ void Cache::loadBlockFromLowerLevel(uint32_t addr, uint32_t *cycles) {
   uint32_t replaceId = this->getReplacementBlockId(blockIdBegin, blockIdEnd);
   Block replaceBlock = this->blocks[replaceId];
   
+  if(tech == FIFO) FIFO_id.push(replaceId);
+
   if (replaceBlock.valid && replaceBlock.modified) {
     this->writeBlockToLowerLevel(replaceBlock);
     this->statistics.totalCycles += this->policy.missLatency;
@@ -254,6 +304,13 @@ uint32_t Cache::getReplacementBlockId(uint32_t begin, uint32_t end) {
   for (uint32_t i = begin; i < end; ++i) {
     if (!this->blocks[i].valid)
       return i;
+  }
+
+  if (tech == FIFO)
+  {
+    uint32_t id = FIFO_id.front();
+    FIFO_id.pop();
+    return id;
   }
 
   // Otherwise use LRU

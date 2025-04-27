@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <vector>
 #include "MemoryManager.h"
+#include <queue>
 
 class MemoryManager;
 
@@ -58,7 +59,7 @@ public:
         uint64_t totalCycles;
     };
 
-    Cache(MemoryManager *manager, Policy policy, Cache *lowerCache = nullptr);
+    Cache(MemoryManager *manager, Policy policy, Cache *lowerCache = nullptr, int tech=0);
 
     bool inCache(uint32_t addr);
     uint32_t getBlockId(uint32_t addr);
@@ -78,7 +79,15 @@ private:
     Cache *lowerCache;
     Policy policy;
     std::vector<Block> blocks;
+    int tech;
+    uint32_t previous_stride, previous_address, stride=0;
+    bool is_prefetch = false;
+    int tripleSame, tripleDiff;
 
+    std::queue<uint32_t> FIFO_id;
+
+    void handlePrefetching(uint32_t addr);
+    void prefetch(uint32_t addr);
     void initCache();
     void loadBlockFromLowerLevel(uint32_t addr, uint32_t *cycles);
     uint32_t getReplacementBlockId(uint32_t begin, uint32_t end);
