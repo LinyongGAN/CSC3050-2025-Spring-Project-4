@@ -10,9 +10,14 @@
 #include "MemoryManager.h"
 #include "MultiLevelCacheConfig.h"
 
+#define PREFETCHING 1
+#define FIFO 2
+#define VICTIM 3
+
 bool parseParameters(int argc, char **argv);
 void printUsage();
 
+int tech = 0;
 const char *traceFilePath;
 
 class CacheHierarchy {
@@ -29,10 +34,10 @@ public:
     auto l1policy = MultiLevelCacheConfig::getL1Policy();
     auto l2policy = MultiLevelCacheConfig::getL2Policy();
     auto l3policy = MultiLevelCacheConfig::getL3Policy();
-    
-    l3cache = new Cache(memory, l3policy, nullptr);
-    l2cache = new Cache(memory, l2policy, l3cache);
-    l1cache = new Cache(memory, l1policy, l2cache);
+    if (tech == FIFO) l1policy.associativity = l1policy.blockNum;
+    l3cache = new Cache(memory, l3policy, nullptr, 0);
+    l2cache = new Cache(memory, l2policy, l3cache, 0);
+    l1cache = new Cache(memory, l1policy, l2cache, tech);
     
     memory->setCache(l1cache);
   }
@@ -120,7 +125,7 @@ int main(int argc, char **argv) {
     CacheHierarchy cacheHierarchy;
     char op;
     uint32_t addr;
-    
+   // cacheHierarchy.l1cache->stride = 0; cacheHierarchy.l1cache->is_prefetch = false;
     while (trace >> op >> std::hex >> addr) {
       cacheHierarchy.processMemoryAccess(op, addr);
     }
@@ -137,12 +142,33 @@ int main(int argc, char **argv) {
 
 bool parseParameters(int argc, char **argv) {
   // Read Parameters
-  if (argc > 1) {
-    traceFilePath = argv[1];
-    return true;
-  } else {
+  for (int i = 1; i < argc; ++i) {
+    if (argv[i][0] == '-') {
+      switch (argv[i][1]) {
+      case 'p':
+        tech = PREFETCHING;
+        break;
+      case 'f':
+        tech = FIFO;
+        break;
+      case 'v':
+        tech = VICTIM;
+        break;
+      default:
+        return false;
+      }
+    } else {
+      if (traceFilePath == nullptr) {
+        traceFilePath = argv[i];
+      } else {
+        return false;
+      }
+    }
+  }
+  if (traceFilePath == nullptr) {
     return false;
   }
+  return true;
 }
 
 void printUsage() { printf("Usage: CacheSim trace-file\n"); }
