@@ -20,12 +20,24 @@ void printUsage();
 int tech = 0;
 const char *traceFilePath;
 
+static Cache::Policy getVictimPolicy() {
+  Cache::Policy policy;
+  policy.cacheSize = 8 * 1024;      // 16KB
+  policy.blockSize = 64;
+  policy.blockNum = policy.cacheSize / policy.blockSize;
+  policy.associativity = policy.blockNum;
+  policy.hitLatency = 1;
+  policy.missLatency = 8;
+  return policy;
+}
+
 class CacheHierarchy {
 private:
   MemoryManager* memory;
   Cache* l1cache;
   Cache* l2cache;
   Cache* l3cache;
+  Cache* victimCache;
 
 public:
   CacheHierarchy() {
@@ -34,10 +46,17 @@ public:
     auto l1policy = MultiLevelCacheConfig::getL1Policy();
     auto l2policy = MultiLevelCacheConfig::getL2Policy();
     auto l3policy = MultiLevelCacheConfig::getL3Policy();
+    Cache::Policy victimPolicy;
     if (tech == FIFO) l1policy.associativity = l1policy.blockNum;
-    l3cache = new Cache(memory, l3policy, nullptr, 0);
-    l2cache = new Cache(memory, l2policy, l3cache, 0);
-    l1cache = new Cache(memory, l1policy, l2cache, tech);
+    if (tech == VICTIM) victimPolicy = getVictimPolicy();
+
+    l3cache = new Cache(memory, l3policy, nullptr, 0, nullptr);
+    l2cache = new Cache(memory, l2policy, l3cache, 0, nullptr);
+    if (tech != VICTIM) l1cache = new Cache(memory, l1policy, l2cache, tech, nullptr);
+    else {
+      victimCache = new Cache(memory, victimPolicy, nullptr, tech, nullptr);
+      l1cache = new Cache(memory, l1policy, l2cache, tech, victimCache);
+    }
     
     memory->setCache(l1cache);
   }
@@ -46,6 +65,7 @@ public:
     delete l1cache;
     delete l2cache;
     delete l3cache;
+    delete victimCache;
     delete memory;
   }
   
@@ -82,6 +102,7 @@ public:
 
     // modified
     outputCacheStats(csvFile, "L1", l1cache);
+    if (tech == VICTIM) outputCacheStats(csvFile, "victim", victimCache);
     outputCacheStats(csvFile, "L2", l2cache);
     outputCacheStats(csvFile, "L3", l3cache);
 
